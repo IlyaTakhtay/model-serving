@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+logs/
+tmp/
+experiments/stage6/results/
+experiments/results/
+experiments/detection/artifacts/*.onnx
+experiments/detection/datasets/
+experiments/detection/results/
+models/**/*.onnx
+*.stdout.log
+*.stderr.log

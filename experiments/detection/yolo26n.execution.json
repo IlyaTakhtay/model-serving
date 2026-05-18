@@ -1,0 +1,7 @@
+{
+  "execution": {
+    "providers": ["CPUExecutionProvider"],
+    "intra_op_num_threads": 4,
+    "inter_op_num_threads": 1
+  }
+}
