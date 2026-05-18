@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Awaitable, Callable
 
 from app.data_plane.tensor_inference.observer import InferenceTelemetrySpan
-from app.data_plane.worker_runtime.runtime import WorkerRuntime
+from app.data_plane.worker_runtime.interfaces import RuntimeSupervisor
 from app.observability.recorder import ObservabilityRecorder
 
 
 class InferenceTelemetryRecorder:
     def __init__(
         self,
-        runtime: WorkerRuntime,
+        runtime: RuntimeSupervisor,
         recorder: ObservabilityRecorder,
-        on_request_recorded: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self.runtime = runtime
         self.recorder = recorder
-        self.on_request_recorded = on_request_recorded
 
     def start(
         self, model_name: str, version: str, request_id: str | None
@@ -46,7 +43,6 @@ class InferenceTelemetryRecorder:
             timings_ms=recorded_timings,
             resources=resources,
         )
-        await self._evaluate_auto_rollback(span.model_name)
 
     async def record_error(self, span: InferenceTelemetrySpan, error_code: str) -> None:
         total_ms = self._elapsed_ms(span)
@@ -60,7 +56,6 @@ class InferenceTelemetryRecorder:
             resources=resources,
             error_code=error_code,
         )
-        await self._evaluate_auto_rollback(span.model_name)
 
     def _elapsed_ms(self, span: InferenceTelemetrySpan) -> float:
         return (time.perf_counter() - span.started_at) * 1000.0
@@ -91,7 +86,3 @@ class InferenceTelemetryRecorder:
             )
             resources["cpu_usage_percent"] = cpu_seconds / (elapsed_ms / 1000.0) * 100.0
         return resources
-
-    async def _evaluate_auto_rollback(self, model_name: str) -> None:
-        if self.on_request_recorded is not None:
-            await self.on_request_recorded(model_name)

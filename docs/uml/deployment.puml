@@ -1,0 +1,37 @@
+@startuml
+title Local model serving - deployment view
+
+node "Edge Linux device" {
+  node "Python service process" as Service {
+    artifact "Litestar REST API"
+    artifact "Application services"
+    artifact "Model registry access"
+    artifact "Observability recorder"
+  }
+
+  node "Worker process: yolo26n" as WorkerA {
+    artifact "ONNX Runtime session"
+    artifact "model.onnx"
+  }
+
+  node "Worker process: efficientnet_lite4" as WorkerB {
+    artifact "ONNX Runtime session"
+    artifact "model.onnx"
+  }
+
+  database "models/" as Models
+  file "config/active_models.json" as ActiveConfig
+  file "logs/observability.ring" as RingLog
+}
+
+node "Operator workstation" as Operator
+node "HTTP client / experiment runner" as Client
+
+Operator --> Service: model upload / activate / rollback
+Client --> Service: inference requests
+Service --> WorkerA: stdin/stdout IPC
+Service --> WorkerB: stdin/stdout IPC
+Service --> Models: read/write model versions
+Service --> ActiveConfig: read/write active versions
+Service --> RingLog: append diagnostic events
+@enduml

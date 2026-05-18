@@ -1,0 +1,89 @@
+@startuml
+title Local model serving - top-level architecture
+
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+
+actor Client
+
+package "HTTP API layer" as API {
+  [Routes] as Routes
+  [Binary tensor protocol] as BinaryProtocol
+  [Error handling] as ErrorHandling
+}
+
+package "Application layer" as Application {
+  [ModelControlService] as ModelControl
+  [InferenceService] as Inference
+  [ObservabilityService] as ObservabilityApp
+  [ServiceLifecycle] as LifecycleApp
+}
+
+package "Control plane" as Control {
+  [Model management] as ModelManagement
+  [Rollback management] as RollbackManagement
+  [Model registry] as Registry
+  [Active model state] as ActiveState
+}
+
+package "Data plane" as Data {
+  [WorkerRuntime] as WorkerRuntime
+  [Worker process] as WorkerProcess
+  [Runtime adapter] as RuntimeAdapter
+}
+
+package "Runtime observability" as Observability {
+  [ObservabilityRecorder] as Recorder
+  [ResourceSampler] as ResourceSampler
+  [InferenceTelemetryRecorder] as InferenceTelemetry
+  [Prometheus exporter] as PrometheusExporter
+}
+
+Client --> Routes
+
+Routes --> BinaryProtocol
+Routes --> ErrorHandling
+Routes --> ModelControl
+Routes --> Inference
+Routes --> ObservabilityApp
+
+ModelControl --> ModelManagement
+ModelControl --> RollbackManagement
+
+Inference --> WorkerRuntime
+Inference --> InferenceTelemetry
+
+ObservabilityApp --> Recorder
+ObservabilityApp --> PrometheusExporter
+
+LifecycleApp --> ModelManagement
+LifecycleApp --> WorkerRuntime
+LifecycleApp --> ResourceSampler
+
+ModelManagement --> Registry
+ModelManagement --> ActiveState
+ModelManagement --> WorkerRuntime
+
+RollbackManagement --> Recorder
+RollbackManagement --> ModelManagement
+
+InferenceTelemetry --> Recorder
+ResourceSampler --> WorkerRuntime
+ResourceSampler --> Recorder
+Recorder --> RollbackManagement : publishes events
+
+WorkerRuntime --> WorkerProcess
+WorkerProcess --> RuntimeAdapter
+
+note right of Recorder
+  Event logging, request/resource history
+  and runtime snapshots are hidden behind
+  one observability entry point.
+end note
+
+note bottom of WorkerRuntime
+  Owns worker pool, IPC,
+  CPU budget and restart handling.
+end note
+
+@enduml

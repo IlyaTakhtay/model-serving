@@ -1,0 +1,39 @@
+@startuml
+title Data plane - detail
+
+skinparam componentStyle rectangle
+
+[InferenceService] as Inference
+[Tensor contract validation] as TensorContract
+[WorkerRuntime] as WorkerRuntime
+[LoadedModel] as LoadedModel
+[Worker IPC] as IPC
+[Worker process] as WorkerProcess
+[RuntimeAdapterFactory] as AdapterFactory
+[ModelRuntimeAdapter] as RuntimeAdapter
+[OnnxRuntimeAdapter] as Onnx
+[OpenVinoRuntimeAdapter] as OpenVino
+
+Inference --> TensorContract
+Inference --> WorkerRuntime
+
+WorkerRuntime --> LoadedModel
+WorkerRuntime --> IPC
+IPC --> WorkerProcess
+
+WorkerProcess --> AdapterFactory
+AdapterFactory --> RuntimeAdapter
+RuntimeAdapter <|.. Onnx
+RuntimeAdapter <|.. OpenVino
+
+note right of WorkerRuntime
+  Master side: owns loaded worker handles,
+  CPU budget, IPC calls and restart handling.
+end note
+
+note right of WorkerProcess
+  Worker side: owns the runtime session
+  and executes tensor inference.
+end note
+
+@enduml

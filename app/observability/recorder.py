@@ -1,14 +1,28 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
-from app.observability.events import ObservabilityEvent, make_event
+from app.observability.events import ObservabilityEvent, event_to_dict, make_event
+from app.observability.state.memory import InMemoryObservabilityState
+from app.observability.storage.ring import RingEventStorage
 from app.observability.writer import ObservabilityWriter
+
+EventListener = Callable[[ObservabilityEvent], Awaitable[None]]
 
 
 class ObservabilityRecorder:
-    def __init__(self, writer: ObservabilityWriter) -> None:
-        self._writer = writer
+    def __init__(
+        self,
+        storage: RingEventStorage,
+        state: InMemoryObservabilityState,
+        *,
+        queue_size: int = 10000,
+    ) -> None:
+        self._storage = storage
+        self._state = state
+        self._writer = ObservabilityWriter(storage, state, queue_size=queue_size)
+        self._listeners: list[EventListener] = []
 
     def start(self) -> None:
         self._writer.start()
@@ -16,9 +30,15 @@ class ObservabilityRecorder:
     async def stop(self) -> None:
         await self._writer.stop()
 
+    def subscribe(self, listener: EventListener) -> None:
+        self._listeners.append(listener)
+
     async def record(self, event: str, **fields: Any) -> ObservabilityEvent:
         observation = make_event(event, **fields)
-        return await self._writer.write(observation)
+        written = await self._writer.write(observation)
+        for listener in tuple(self._listeners):
+            await listener(written)
+        return written
 
     async def record_inference(
         self,
@@ -63,5 +83,60 @@ class ObservabilityRecorder:
             worker_restart_failures=snapshot.get("worker_restart_failures"),
         )
 
+    async def record_runtime_sample(
+        self,
+        *,
+        cpu_budget_threads: int,
+        cpu_requested_threads: int,
+        loaded_models: dict[str, str],
+    ) -> ObservabilityEvent:
+        return await self.record(
+            "RUNTIME_SAMPLED",
+            cpu_budget_threads=cpu_budget_threads,
+            cpu_requested_threads=cpu_requested_threads,
+            cpu_available_threads=cpu_budget_threads - cpu_requested_threads,
+            loaded_models=dict(loaded_models),
+        )
+
     def replay_state(self, limit: int | None = None) -> None:
         self._writer.replay_state(limit=limit)
+
+    def recent_timings(
+        self, model_name: str | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        return self._state.recent_timings(model_name, limit)
+
+    def request_history(
+        self, model_name: str, version: str | None = None, limit: int = 1000
+    ) -> list[dict[str, Any]]:
+        return self._state.request_history(model_name, version, limit)
+
+    def clear_request_history(
+        self, model_name: str, version: str | None = None
+    ) -> None:
+        self._state.clear_request_history(model_name, version)
+
+    def latest_resources(self) -> dict[str, dict[str, Any]]:
+        return self._state.latest_resources()
+
+    def latest_runtime(self) -> dict[str, Any]:
+        return self._state.latest_runtime()
+
+    def resource_history(
+        self,
+        model_name: str,
+        version: str | None = None,
+        *,
+        window_sec: float | None = None,
+        limit: int = 10000,
+    ) -> list[dict[str, Any]]:
+        return self._state.resource_history(
+            model_name, version, window_sec=window_sec, limit=limit
+        )
+
+    def metrics_snapshot(self) -> dict[str, dict]:
+        return self._state.metrics_snapshot()
+
+    def recent_events(self, limit: int = 100) -> list[dict[str, Any]]:
+        limit = max(0, min(limit, 1000))
+        return [event_to_dict(event) for event in self._storage.read_latest(limit)]

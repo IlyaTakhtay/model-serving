@@ -3,34 +3,12 @@ from __future__ import annotations
 import os
 
 import uvicorn
-from litestar import Litestar
 
-from .api.routes import dependencies, route_handlers
+from .api.rest import LitestarRestTransport
 from .config.settings import Settings
-from .container import ApplicationContainer
 
 settings = Settings.from_env()
-
-
-async def on_startup(app: Litestar) -> None:
-    container = ApplicationContainer.build(settings)
-    app.state.container = container
-    await container.background.startup()
-
-
-async def on_shutdown(app: Litestar) -> None:
-    container = getattr(app.state, "container", None)
-    if container is not None:
-        await container.background.shutdown()
-
-
-app = Litestar(
-    route_handlers=route_handlers,
-    dependencies=dependencies,
-    on_startup=[on_startup],
-    on_shutdown=[on_shutdown],
-    request_max_body_size=settings.request_max_body_size,
-)
+app = LitestarRestTransport(settings).build_app()
 
 
 def main() -> None:

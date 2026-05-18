@@ -6,10 +6,9 @@ from app.common.exceptions import ModelNotReadyError
 from app.control_plane.model_management.active_state import ActiveModelStateStore
 from app.control_plane.model_management.lifecycle import ModelLifecycle
 from app.control_plane.model_management.registry import ModelRegistry
-from app.data_plane.worker_runtime.runtime import WorkerRuntime
+from app.data_plane.worker_runtime.interfaces import RuntimeSupervisor
 from app.domain.rollback import RollbackPolicy, RollbackStats, RollbackViolation
 from app.observability.recorder import ObservabilityRecorder
-from app.observability.state.memory import InMemoryObservabilityState
 
 
 class AutoRollbackEvaluator:
@@ -17,15 +16,13 @@ class AutoRollbackEvaluator:
         self,
         registry: ModelRegistry,
         active_state: ActiveModelStateStore,
-        runtime: WorkerRuntime,
-        observability_state: InMemoryObservabilityState,
+        runtime: RuntimeSupervisor,
         observability_recorder: ObservabilityRecorder,
         lifecycle: ModelLifecycle,
     ) -> None:
         self.registry = registry
         self.active_state = active_state
         self.runtime = runtime
-        self.observability_state = observability_state
         self.observability_recorder = observability_recorder
         self.lifecycle = lifecycle
 
@@ -41,7 +38,7 @@ class AutoRollbackEvaluator:
                 model_name, active, policy, "disabled", [], {"requests": 0}, None
             )
 
-        history = self.observability_state.request_history(
+        history = self.observability_recorder.request_history(
             model_name, active, limit=policy.window_size
         )
         stats = self._stats(model_name, active, policy, history)
@@ -90,7 +87,7 @@ class AutoRollbackEvaluator:
         self.active_state.record_auto_rollback_block(
             model_name, from_version=active, to_version=rollback["active"]
         )
-        self.observability_state.clear_request_history(model_name, rollback["active"])
+        self.observability_recorder.clear_request_history(model_name, rollback["active"])
         await self.observability_recorder.record(
             "ROLLBACK_POLICY_TRIGGERED",
             model=model_name,
@@ -117,7 +114,7 @@ class AutoRollbackEvaluator:
             for row in history
             if "compute_infer" in row.get("timings_ms", {})
         ]
-        latest_resources = self.observability_state.resource_history(
+        latest_resources = self.observability_recorder.resource_history(
             model_name, version, limit=1
         )
         latest_resource = latest_resources[-1] if latest_resources else {}
@@ -236,7 +233,7 @@ class AutoRollbackEvaluator:
         cpu_policy = policy.max_cpu_usage_percent_window
         if cpu_policy is None:
             return []
-        rows = self.observability_state.resource_history(
+        rows = self.observability_recorder.resource_history(
             model_name, version, window_sec=cpu_policy.window_sec
         )
         return [

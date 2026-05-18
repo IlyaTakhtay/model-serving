@@ -8,7 +8,7 @@ EXPERIMENT="${1:?Usage: bash scripts/run_single_experiment.sh <latency|resources
 shift || true
 
 cd "$ROOT_DIR"
-python -m experiments.stage6.run_experiment \
+python -m experiments.measurements.run_experiment \
   --experiment "$EXPERIMENT" \
   --artifact experiments/detection/artifacts/yolo26n.onnx \
   --metadata experiments/detection/yolo26n.execution.json \

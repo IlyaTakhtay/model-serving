@@ -14,7 +14,7 @@ async def health() -> dict[str, str]:
 
 @get("/ready")
 async def ready(container: ApplicationContainer) -> dict[str, Any]:
-    loaded = container.models.loaded_models()
+    loaded = container.model_control.loaded_models()
     return {"status": "ok" if loaded else "not_ready", "loaded_models": loaded}
 
 

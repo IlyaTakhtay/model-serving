@@ -4,11 +4,12 @@ __pycache__/
 venv/
 logs/
 tmp/
-experiments/stage6/results/
+inputs/
 experiments/results/
 experiments/detection/artifacts/*.onnx
+experiments/classification/artifacts/*.onnx
 experiments/detection/datasets/
 experiments/detection/results/
-models/**/*.onnx
+models/
 *.stdout.log
 *.stderr.log

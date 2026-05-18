@@ -19,7 +19,7 @@ import psutil
 import requests
 
 from app.data_plane.worker_runtime.ipc import read_frame, read_message, write_message
-from experiments.stage6.stage6_common import (
+from experiments.support.common import (
     apply_cpu_profile_to_execution,
     create_input_cases,
     find_free_port,
@@ -144,7 +144,7 @@ class Stage6Runner:
             [
                 sys.executable,
                 "-m",
-                "experiments.stage6.baseline_daemon",
+                "experiments.measurements.baseline_daemon",
                 "--model-path",
                 str(current / "model.onnx"),
                 "--metadata",
@@ -319,7 +319,7 @@ class Stage6Runner:
         return [
             sys.executable,
             "-m",
-            "experiments.stage6.baseline_direct",
+            "experiments.measurements.baseline_direct",
             mode,
             "--model-path",
             str(current / "model.onnx"),
@@ -494,8 +494,8 @@ class Stage6Runner:
                     "kill <baseline-pid>",
                     "cp ./v2/model.onnx ./current/model.onnx",
                     "cp ./v2/model.json ./current/model.json",
-                    "python -m experiments.stage6.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
-                    "python -m experiments.stage6.baseline_direct infer --model-path ./current/model.onnx --metadata ./current/model.json --input-dir ./inputs --requests 1 --concurrency 1 --output ./smoke.json",
+                    "python -m experiments.measurements.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
+                    "python -m experiments.measurements.baseline_direct infer --model-path ./current/model.onnx --metadata ./current/model.json --input-dir ./inputs --requests 1 --concurrency 1 --output ./smoke.json",
                 ],
                 "typed_command_count": 5,
             },
@@ -560,8 +560,8 @@ class Stage6Runner:
                     "kill <baseline-pid>",
                     "cp ./backup-v1/model.onnx ./current/model.onnx",
                     "cp ./backup-v1/model.json ./current/model.json",
-                    "python -m experiments.stage6.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
-                    "python -m experiments.stage6.baseline_direct infer --model-path ./current/model.onnx --metadata ./current/model.json --input-dir ./inputs --requests 1 --concurrency 1 --output ./smoke.json",
+                    "python -m experiments.measurements.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
+                    "python -m experiments.measurements.baseline_direct infer --model-path ./current/model.onnx --metadata ./current/model.json --input-dir ./inputs --requests 1 --concurrency 1 --output ./smoke.json",
                 ],
                 "typed_command_count": 6,
                 "note": "Rollback exists only if the operator kept a backup explicitly.",
@@ -617,7 +617,7 @@ class Stage6Runner:
                     "ls ./backup-v1",
                     "cp ./backup-v1/model.onnx ./current/model.onnx",
                     "cp ./backup-v1/model.json ./current/model.json",
-                    "python -m experiments.stage6.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
+                    "python -m experiments.measurements.baseline_daemon --model-path ./current/model.onnx --metadata ./current/model.json --cpu-profile n150",
                 ],
                 "typed_command_count": 4,
             },
@@ -795,7 +795,7 @@ def cpu_profile_summary(cpu_profile: str) -> dict[str, Any]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Stage 6 isolated comparison experiments")
+    parser = argparse.ArgumentParser(description="Isolated comparison experiments")
     parser.add_argument(
         "--experiment",
         required=True,
@@ -818,7 +818,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cpu-profile", choices=["n150", "host"], default="n150")
     parser.add_argument("--run-id", default=None)
-    parser.add_argument("--output-root", default="experiments/stage6/results")
+    parser.add_argument("--output-root", default="experiments/results")
     parser.add_argument("--startup-timeout-sec", type=float, default=90.0)
     parser.add_argument("--command-timeout-sec", type=float, default=300.0)
     return parser.parse_args()

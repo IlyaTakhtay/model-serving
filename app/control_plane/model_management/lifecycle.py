@@ -12,7 +12,7 @@ from app.common.exceptions import (
 from app.common.tensor_datatypes import DATATYPE_TO_DTYPE
 from app.control_plane.model_management.active_state import ActiveModelStateStore
 from app.control_plane.model_management.registry import ModelRegistry
-from app.data_plane.worker_runtime.runtime import LoadedModel, WorkerRuntime
+from app.data_plane.worker_runtime.interfaces import LoadedRuntimeModel, RuntimeSupervisor
 from app.observability.recorder import ObservabilityRecorder
 from app.schemas.model import ModelMetadata
 
@@ -22,7 +22,7 @@ class ModelLifecycle:
         self,
         registry: ModelRegistry,
         active_state: ActiveModelStateStore,
-        runtime: WorkerRuntime,
+        runtime: RuntimeSupervisor,
         recorder: ObservabilityRecorder,
     ) -> None:
         self.registry = registry
@@ -120,7 +120,7 @@ class ModelLifecycle:
         return await self.runtime.load(model_name, version, artifact_path, metadata)
 
     async def _run_healthcheck(
-        self, loaded: LoadedModel, metadata: ModelMetadata
+        self, loaded: LoadedRuntimeModel, metadata: ModelMetadata
     ) -> dict[str, Any]:
         inputs, payload = self._dummy_inputs(metadata)
         output_names = [spec.name for spec in metadata.outputs]

@@ -1,0 +1,54 @@
+@startuml
+title Control plane - detail
+
+skinparam componentStyle rectangle
+
+[ModelControlService] as ModelControl
+[ModelCatalog] as Catalog
+[ModelUploader] as Uploader
+[ModelLifecycle] as Lifecycle
+[AutoRollbackPolicyManager] as PolicyManager
+[AutoRollbackMonitor] as RollbackMonitor
+[AutoRollbackEvaluator] as RollbackEvaluator
+[ModelRegistry] as Registry
+[ActiveModelStateStore] as ActiveState
+[ArtifactInspectorRegistry] as Inspectors
+[WorkerRuntime] as WorkerRuntime
+[ObservabilityRecorder] as Recorder
+
+ModelControl --> Catalog
+ModelControl --> Uploader
+ModelControl --> Lifecycle
+ModelControl --> PolicyManager
+
+Catalog --> Registry
+Catalog --> ActiveState
+Catalog --> WorkerRuntime
+
+Uploader --> Registry
+Uploader --> Inspectors
+Uploader --> Lifecycle
+Uploader --> Recorder
+
+Lifecycle --> Registry
+Lifecycle --> ActiveState
+Lifecycle --> WorkerRuntime
+Lifecycle --> Recorder
+
+PolicyManager --> Registry
+PolicyManager --> ActiveState
+PolicyManager --> Recorder
+
+RollbackMonitor --> RollbackEvaluator
+RollbackMonitor --> Recorder
+RollbackEvaluator --> Lifecycle
+RollbackEvaluator --> ActiveState
+RollbackEvaluator --> Registry
+RollbackEvaluator --> Recorder
+
+note bottom of RollbackMonitor
+  Monitor is event-driven:
+  observability facts trigger policy evaluation.
+end note
+
+@enduml

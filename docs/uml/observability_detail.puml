@@ -1,0 +1,36 @@
+@startuml
+title Observability - detail
+
+skinparam componentStyle rectangle
+
+[InferenceTelemetryRecorder] as InferenceTelemetry
+[ResourceSampler] as ResourceSampler
+[ObservabilityService] as ObservabilityApp
+[ObservabilityRecorder] as Recorder
+[ObservabilityWriter] as Writer
+[RingEventStorage] as EventStorage
+[InMemoryObservabilityState] as State
+[Prometheus exporter] as Prometheus
+[AutoRollbackMonitor] as RollbackMonitor
+[WorkerRuntime] as WorkerRuntime
+
+InferenceTelemetry --> Recorder
+ResourceSampler --> WorkerRuntime
+ResourceSampler --> Recorder
+
+ObservabilityApp --> Recorder
+ObservabilityApp --> Prometheus
+
+Recorder --> Writer
+Writer --> EventStorage
+Writer --> State
+Recorder --> State : query facade
+Recorder --> RollbackMonitor : publishes events
+
+note bottom of Recorder
+  Public observability facade:
+  records facts, keeps history query surface,
+  and publishes events to subscribers.
+end note
+
+@enduml

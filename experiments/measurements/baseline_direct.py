@@ -11,7 +11,7 @@ from typing import Any
 import onnxruntime as ort
 import psutil
 
-from experiments.stage6.stage6_common import (
+from experiments.support.common import (
     load_input_case,
     make_session_options,
     read_json,

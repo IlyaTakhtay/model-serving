@@ -13,9 +13,9 @@ from app.schemas.upload import ModelUploadChunkRequest, ModelUploadRequest
 @get("/v1/models")
 async def list_models(container: ApplicationContainer) -> dict[str, Any]:
     try:
-        return container.models.list_models()
+        return container.model_control.list_models()
     except ServingError as exc:
-        raise_recorded_error(container, exc)
+        await raise_recorded_error(container, exc)
 
 
 @get("/v1/models/{model_name:str}")
@@ -23,9 +23,9 @@ async def describe_model(
     model_name: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return container.models.describe_model(model_name)
+        return container.model_control.describe_model(model_name)
     except ServingError as exc:
-        raise_recorded_error(container, exc)
+        await raise_recorded_error(container, exc)
 
 
 @post("/v1/models/{model_name:str}/versions/{version:str}/upload")
@@ -36,9 +36,9 @@ async def upload_model(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return await container.models.upload(model_name, version, data)
+        return await container.model_control.upload(model_name, version, data)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "MODEL_UPLOAD_FAILED", model=model_name, version=version
         )
 
@@ -51,9 +51,9 @@ async def upload_model_chunk(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return await container.models.upload_chunk(model_name, version, data)
+        return await container.model_control.upload_chunk(model_name, version, data)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container,
             exc,
             "MODEL_UPLOAD_CHUNK_FAILED",
@@ -67,9 +67,9 @@ async def activate_model(
     model_name: str, version: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return await container.models.activate(model_name, version)
+        return await container.model_control.activate(model_name, version)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "MODEL_ACTIVATE_FAILED", model=model_name, version=version
         )
 
@@ -79,9 +79,9 @@ async def deactivate_model(
     model_name: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return await container.models.deactivate(model_name)
+        return await container.model_control.deactivate(model_name)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "MODEL_DEACTIVATE_FAILED", model=model_name
         )
 
@@ -91,9 +91,11 @@ async def rollback_model(
     model_name: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return await container.models.rollback(model_name)
+        return await container.model_control.rollback(model_name)
     except ServingError as exc:
-        raise_recorded_error(container, exc, "MODEL_ROLLBACK_FAILED", model=model_name)
+        await raise_recorded_error(
+            container, exc, "MODEL_ROLLBACK_FAILED", model=model_name
+        )
 
 
 @get("/v1/models/{model_name:str}/rollback-policy")
@@ -101,9 +103,9 @@ async def get_active_rollback_policy(
     model_name: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return container.models.get_active_rollback_policy(model_name)
+        return container.model_control.get_active_rollback_policy(model_name)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "ROLLBACK_POLICY_READ_FAILED", model=model_name
         )
 
@@ -115,9 +117,9 @@ async def set_active_rollback_policy(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return container.models.set_active_rollback_policy(model_name, data)
+        return await container.model_control.set_active_rollback_policy(model_name, data)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "ROLLBACK_POLICY_UPDATE_FAILED", model=model_name
         )
 
@@ -127,9 +129,9 @@ async def disable_active_rollback_policy(
     model_name: str, container: ApplicationContainer
 ) -> dict[str, Any]:
     try:
-        return container.models.disable_active_rollback_policy(model_name)
+        return await container.model_control.disable_active_rollback_policy(model_name)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container, exc, "ROLLBACK_POLICY_DISABLE_FAILED", model=model_name
         )
 
@@ -141,9 +143,9 @@ async def get_version_rollback_policy(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return container.models.get_version_rollback_policy(model_name, version)
+        return container.model_control.get_version_rollback_policy(model_name, version)
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container,
             exc,
             "ROLLBACK_POLICY_READ_FAILED",
@@ -160,9 +162,11 @@ async def set_version_rollback_policy(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return container.models.set_version_rollback_policy(model_name, version, data)
+        return await container.model_control.set_version_rollback_policy(
+            model_name, version, data
+        )
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container,
             exc,
             "ROLLBACK_POLICY_UPDATE_FAILED",
@@ -181,9 +185,11 @@ async def disable_version_rollback_policy(
     container: ApplicationContainer,
 ) -> dict[str, Any]:
     try:
-        return container.models.disable_version_rollback_policy(model_name, version)
+        return await container.model_control.disable_version_rollback_policy(
+            model_name, version
+        )
     except ServingError as exc:
-        raise_recorded_error(
+        await raise_recorded_error(
             container,
             exc,
             "ROLLBACK_POLICY_DISABLE_FAILED",

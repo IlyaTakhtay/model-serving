@@ -4,6 +4,7 @@ import asyncio
 import sys
 import time
 from collections import defaultdict
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -96,12 +97,12 @@ class WorkerRuntime:
             ready = await asyncio.wait_for(
                 self._read_ready_frame(process), timeout=self.worker_startup_timeout_sec
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             await process.wait()
             raise WorkerStartupError(
                 f"Worker startup timed out for {model_name}:{version}"
-            )
+            ) from None
 
         if not ready or ready.get("status") != "ready":
             process.kill()
@@ -133,6 +134,12 @@ class WorkerRuntime:
     async def unload(self, model_name: str) -> dict[str, Any]:
         loaded = self._models.pop(model_name, None)
         return await self._terminate_loaded(loaded)
+
+    async def shutdown_all(self) -> dict[str, Any]:
+        unloaded = {}
+        for model_name in list(self._models):
+            unloaded[model_name] = await self.unload(model_name)
+        return {"unloaded": unloaded}
 
     def is_ready(self, model_name: str) -> bool:
         loaded = self._models.get(model_name)
@@ -285,10 +292,8 @@ class WorkerRuntime:
 
     def _process_tree_metrics(self, root: psutil.Process) -> dict[str, Any]:
         processes = [root]
-        try:
+        with suppress(psutil.Error):
             processes.extend(root.children(recursive=True))
-        except psutil.Error:
-            pass
 
         memory_mb = 0.0
         cpu_seconds = 0.0

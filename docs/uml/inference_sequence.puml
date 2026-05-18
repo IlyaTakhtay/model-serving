@@ -1,0 +1,37 @@
+@startuml
+title Tensor inference request - sequence view
+
+actor Client
+participant "REST route\n/v1/models/{model}/infer" as Route
+participant BinaryTensorCodec as Protocol
+participant InferenceService as Inference
+participant RuntimeSupervisor as Runtime
+participant "Worker process" as Worker
+participant ModelRuntimeAdapter as Adapter
+participant InferenceTelemetryRecorder as Telemetry
+participant ObservabilityRecorder as Recorder
+participant AutoRollbackMonitor as Rollback
+
+Client -> Route: POST binary tensor request
+Route -> Protocol: read_binary_tensor_request(request)
+Protocol --> Route: header, payload
+Route -> Inference: infer(model_name, header, payload)
+Inference -> Runtime: get_loaded(model_name)
+Runtime --> Inference: loaded model metadata
+Inference -> Telemetry: start(model, version, request_id)
+Inference -> Inference: validate_inputs()\nvalidate_output_names()
+Inference -> Runtime: infer_tensors(model, inputs, payload, outputs)
+Runtime -> Worker: IPC infer command + binary payload
+Worker -> Adapter: run(output_names, input_feed)
+Adapter --> Worker: output tensors
+Worker --> Runtime: output headers + payload + timings
+Runtime --> Inference: outputs, response payload, timings
+Inference -> Telemetry: record_success(span, timings)
+Telemetry -> Recorder: record timing events and metrics
+Recorder -> Rollback: publish INFERENCE event
+Rollback -> Rollback: evaluate policy when needed
+Inference --> Route: response header, response payload
+Route -> Protocol: make_binary_tensor_response(header, payload)
+Protocol --> Route: octet-stream response
+Route --> Client: 200 OK
+@enduml

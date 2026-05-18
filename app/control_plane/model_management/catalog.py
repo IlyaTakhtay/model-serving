@@ -7,7 +7,7 @@ import msgspec
 from app.common.exceptions import ModelNotFoundError
 from app.control_plane.model_management.active_state import ActiveModelStateStore
 from app.control_plane.model_management.registry import ModelRegistry
-from app.data_plane.worker_runtime.runtime import WorkerRuntime
+from app.data_plane.worker_runtime.interfaces import RuntimeSupervisor
 
 
 class ModelCatalog:
@@ -15,7 +15,7 @@ class ModelCatalog:
         self,
         registry: ModelRegistry,
         active_state: ActiveModelStateStore,
-        runtime: WorkerRuntime,
+        runtime: RuntimeSupervisor,
     ) -> None:
         self.registry = registry
         self.active_state = active_state

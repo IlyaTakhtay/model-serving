@@ -42,7 +42,6 @@ def make_event(event: str, **fields: Any) -> ObservabilityEvent:
 
 def event_to_dict(event: ObservabilityEvent) -> dict[str, Any]:
     data = msgspec.to_builtins(event)
-    # Keep the public event shape compatible with the old JSONL endpoint.
     data["ts"] = _format_ts(float(data["ts"]))
     details = data.pop("details", None)
     if details:

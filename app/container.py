@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .api.protocols.binary_tensor import BinaryTensorProtocol
-from .application.background import BackgroundApplication
-from .application.inference_serving import TensorInferenceApplication
-from .application.model_serving import ModelServingApplication
-from .application.observability import ObservabilityApplication
+from .application.inference import InferenceService
+from .application.model_control import ModelControlService
+from .application.observability import ObservabilityService
+from .application.service_lifecycle import ServiceLifecycle
 from .config.settings import Settings
 from .control_plane.model_management.active_state import ActiveModelStateStore
-from .control_plane.model_management.artifact_inspector import OnnxArtifactInspector
+from .control_plane.model_management.artifact_inspector import (
+    ArtifactInspectorRegistry,
+    OnnxArtifactInspector,
+)
 from .control_plane.model_management.catalog import ModelCatalog
 from .control_plane.model_management.lifecycle import ModelLifecycle
 from .control_plane.model_management.registry import ModelRegistry
@@ -17,24 +19,21 @@ from .control_plane.model_management.uploader import ModelUploader
 from .control_plane.rollback.auto_evaluator import AutoRollbackEvaluator
 from .control_plane.rollback.monitor import AutoRollbackMonitor
 from .control_plane.rollback.policy_manager import AutoRollbackPolicyManager
-from .data_plane.tensor_inference.inferencer import TensorInferencer
 from .data_plane.worker_runtime.runtime import WorkerRuntime
-from .observability.exporters.prometheus import PrometheusMetricsExporter
 from .observability.producers.inference import InferenceTelemetryRecorder
 from .observability.producers.resources import ResourceSampler
 from .observability.recorder import ObservabilityRecorder
 from .observability.state.memory import InMemoryObservabilityState
 from .observability.storage.ring import RingEventStorage
-from .observability.writer import ObservabilityWriter
 
 
 @dataclass
 class ApplicationContainer:
     settings: Settings
-    models: ModelServingApplication
-    inference: TensorInferenceApplication
-    observability: ObservabilityApplication
-    background: BackgroundApplication
+    model_control: ModelControlService
+    inference: InferenceService
+    observability: ObservabilityService
+    lifecycle: ServiceLifecycle
 
     @classmethod
     def build(cls, settings: Settings) -> ApplicationContainer:
@@ -47,16 +46,14 @@ class ApplicationContainer:
             settings.observability.ring_path,
             settings.observability.ring_size_bytes,
         )
-        observability_writer = ObservabilityWriter(
+        observability_recorder = ObservabilityRecorder(
             event_storage,
             observability_state,
             queue_size=settings.observability.queue_size,
         )
-        observability_recorder = ObservabilityRecorder(observability_writer)
         observability_recorder.replay_state(
             limit=settings.observability.replay_records
         )
-        prometheus_exporter = PrometheusMetricsExporter()
         runtime = WorkerRuntime(cpu_budget=settings.cpu_budget)
         registry = ModelRegistry(settings.model_root)
         active_state = ActiveModelStateStore(settings.config_path)
@@ -66,11 +63,11 @@ class ApplicationContainer:
             runtime,
             observability_recorder,
         )
-        artifact_inspector = OnnxArtifactInspector()
+        artifact_inspectors = ArtifactInspectorRegistry([OnnxArtifactInspector()])
         uploader = ModelUploader(
             registry,
             lifecycle,
-            artifact_inspector,
+            artifact_inspectors,
             settings.upload_tmp_root,
             observability_recorder,
         )
@@ -79,18 +76,15 @@ class ApplicationContainer:
             registry,
             active_state,
             runtime,
-            observability_state,
             observability_recorder,
             lifecycle,
         )
         rollback_monitor = AutoRollbackMonitor(rollback, observability_recorder)
+        observability_recorder.subscribe(rollback_monitor.on_observability_event)
         inference_observer = InferenceTelemetryRecorder(
             runtime,
             observability_recorder,
-            on_request_recorded=rollback_monitor.on_request_recorded,
         )
-        inferencer = TensorInferencer(runtime, inference_observer)
-        inference = TensorInferenceApplication(BinaryTensorProtocol(), inferencer)
         rollback_policies = AutoRollbackPolicyManager(
             registry, active_state, observability_recorder
         )
@@ -98,22 +92,17 @@ class ApplicationContainer:
             runtime,
             observability_recorder,
             settings.resource_sampling_interval_sec,
-            on_snapshot_recorded=rollback_monitor.on_resource_snapshot,
         )
         return cls(
             settings=settings,
-            models=ModelServingApplication(
+            model_control=ModelControlService(
                 catalog, lifecycle, uploader, rollback_policies
             ),
-            inference=inference,
-            observability=ObservabilityApplication(
+            inference=InferenceService(runtime, inference_observer),
+            observability=ObservabilityService(
                 observability_recorder,
-                event_storage,
-                observability_state,
-                prometheus_exporter,
-                runtime,
             ),
-            background=BackgroundApplication(
+            lifecycle=ServiceLifecycle(
                 lifecycle, runtime, resource_sampler, observability_recorder
             ),
         )

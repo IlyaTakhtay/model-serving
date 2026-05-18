@@ -26,6 +26,7 @@ class InMemoryObservabilityState:
             lambda: deque(maxlen=resource_window_maxlen)
         )
         self._latest_resources: dict[str, dict[str, Any]] = {}
+        self._latest_runtime: dict[str, Any] = {}
         self._requests_total: defaultdict[tuple[str, str, str], int] = defaultdict(int)
         self._errors_total: defaultdict[str, int] = defaultdict(int)
         self._timing_sum: defaultdict[tuple[str, str, str], float] = defaultdict(float)
@@ -37,6 +38,8 @@ class InMemoryObservabilityState:
                 self._apply_inference(event)
             elif event.event == "RESOURCE_SAMPLED":
                 self._apply_resource(event)
+            elif event.event == "RUNTIME_SAMPLED":
+                self._apply_runtime(event)
             elif event.error_code:
                 self._errors_total[event.error_code] += 1
 
@@ -94,6 +97,10 @@ class InMemoryObservabilityState:
     def latest_resources(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             return {model: dict(row) for model, row in self._latest_resources.items()}
+
+    def latest_runtime(self) -> dict[str, Any]:
+        with self._lock:
+            return dict(self._latest_runtime)
 
     def resource_history(
         self,
@@ -163,3 +170,8 @@ class InMemoryObservabilityState:
         version = event.version or str(data.get("version") or "")
         self._latest_resources[event.model] = data
         self._resource_windows[(event.model, version)].append(data)
+
+    def _apply_runtime(self, event: ObservabilityEvent) -> None:
+        data = event_to_dict(event)
+        data["ts"] = event.ts
+        self._latest_runtime = data

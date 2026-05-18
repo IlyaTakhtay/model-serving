@@ -4,6 +4,7 @@ from typing import Any
 
 from app.common.exceptions import ServingError
 from app.control_plane.rollback.auto_evaluator import AutoRollbackEvaluator
+from app.observability.events import ObservabilityEvent
 from app.observability.recorder import ObservabilityRecorder
 
 
@@ -14,11 +15,13 @@ class AutoRollbackMonitor:
         self.evaluator = evaluator
         self.recorder = recorder
 
-    async def on_request_recorded(self, model_name: str) -> None:
-        await self._evaluate(model_name, trigger="request")
-
-    async def on_resource_snapshot(self, model_name: str) -> None:
-        await self._evaluate(model_name, trigger="resource")
+    async def on_observability_event(self, event: ObservabilityEvent) -> None:
+        if event.model is None:
+            return
+        if event.event in {"INFERENCE", "INFERENCE_FAILED"}:
+            await self._evaluate(event.model, trigger="request")
+        elif event.event == "RESOURCE_SAMPLED" and event.status == "running":
+            await self._evaluate(event.model, trigger="resource")
 
     async def _evaluate(self, model_name: str, trigger: str) -> None:
         try:

@@ -9,7 +9,7 @@ from app.control_plane.rollback.policy_manager import AutoRollbackPolicyManager
 from app.schemas.upload import ModelUploadChunkRequest, ModelUploadRequest
 
 
-class ModelServingApplication:
+class ModelControlService:
     def __init__(
         self,
         catalog: ModelCatalog,
@@ -53,25 +53,25 @@ class ModelServingApplication:
     def get_active_rollback_policy(self, model_name: str) -> dict[str, Any]:
         return self._rollback_policies.get_active_policy(model_name)
 
-    def set_active_rollback_policy(
+    async def set_active_rollback_policy(
         self, model_name: str, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self._rollback_policies.set_active_policy(model_name, data)
+        return await self._rollback_policies.set_active_policy(model_name, data)
 
-    def disable_active_rollback_policy(self, model_name: str) -> dict[str, Any]:
-        return self._rollback_policies.disable_active_policy(model_name)
+    async def disable_active_rollback_policy(self, model_name: str) -> dict[str, Any]:
+        return await self._rollback_policies.disable_active_policy(model_name)
 
     def get_version_rollback_policy(
         self, model_name: str, version: str
     ) -> dict[str, Any]:
         return self._rollback_policies.get_policy(model_name, version)
 
-    def set_version_rollback_policy(
+    async def set_version_rollback_policy(
         self, model_name: str, version: str, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self._rollback_policies.set_policy(model_name, version, data)
+        return await self._rollback_policies.set_policy(model_name, version, data)
 
-    def disable_version_rollback_policy(
+    async def disable_version_rollback_policy(
         self, model_name: str, version: str
     ) -> dict[str, Any]:
-        return self._rollback_policies.disable_policy(model_name, version)
+        return await self._rollback_policies.disable_policy(model_name, version)

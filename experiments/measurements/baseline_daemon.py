@@ -11,7 +11,7 @@ import numpy as np
 import onnxruntime as ort
 
 from app.data_plane.worker_runtime.ipc import read_message, write_frame, write_message
-from experiments.stage6.stage6_common import (
+from experiments.support.common import (
     DATATYPE_TO_DTYPE,
     make_session_options,
     read_json,

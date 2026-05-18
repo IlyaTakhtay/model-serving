@@ -6,10 +6,11 @@ import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+
 import msgspec
 
 from app.common.exceptions import InvalidUploadError
-from app.control_plane.model_management.artifact_inspector import OnnxArtifactInspector
+from app.control_plane.model_management.artifact_inspector import ArtifactInspectorRegistry
 from app.control_plane.model_management.lifecycle import ModelLifecycle
 from app.control_plane.model_management.registry import ModelRegistry
 from app.observability.recorder import ObservabilityRecorder
@@ -22,13 +23,13 @@ class ModelUploader:
         self,
         registry: ModelRegistry,
         lifecycle: ModelLifecycle,
-        artifact_inspector: OnnxArtifactInspector,
+        artifact_inspectors: ArtifactInspectorRegistry,
         upload_tmp_root: Path,
         recorder: ObservabilityRecorder,
     ) -> None:
         self.registry = registry
         self.lifecycle = lifecycle
-        self.artifact_inspector = artifact_inspector
+        self.artifact_inspectors = artifact_inspectors
         self.upload_tmp_root = upload_tmp_root
         self.recorder = recorder
         self.upload_tmp_root.mkdir(parents=True, exist_ok=True)
@@ -95,8 +96,13 @@ class ModelUploader:
             if request_metadata
             else "model.onnx"
         )
+        runtime = (
+            request_metadata.get("runtime", "onnxruntime")
+            if request_metadata
+            else "onnxruntime"
+        )
         metadata = self._metadata_from_uploaded_artifact(
-            model_name, version, artifact_name, artifact
+            model_name, version, runtime, artifact_name, artifact
         )
         self._apply_metadata_overrides(metadata, request_metadata)
         self.registry.save_version(model_name, version, artifact, metadata)
@@ -126,19 +132,21 @@ class ModelUploader:
         self,
         model_name: str,
         version: str,
+        runtime: str,
         artifact_name: str,
         artifact: bytes,
     ) -> ModelMetadata:
-        with NamedTemporaryFile(suffix=".onnx", delete=False) as tmp:
+        suffix = Path(artifact_name).suffix or ".bin"
+        with NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(artifact)
             tmp_path = Path(tmp.name)
         try:
-            return self.artifact_inspector.inspect(
-                model_name, version, artifact_name, tmp_path
+            return self.artifact_inspectors.inspect(
+                runtime, model_name, version, artifact_name, tmp_path
             )
         except Exception as exc:
             raise InvalidUploadError(
-                f"Uploaded artifact is not a valid ONNX model: {exc}"
+                f"Uploaded artifact is not valid for runtime '{runtime}': {exc}"
             ) from exc
         finally:
             tmp_path.unlink(missing_ok=True)

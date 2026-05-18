@@ -2,28 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.data_plane.worker_runtime.runtime import WorkerRuntime
-from app.observability.events import event_to_dict
-from app.observability.exporters.prometheus import PrometheusMetricsExporter
+from app.observability.exporters.prometheus import render_prometheus_metrics
 from app.observability.recorder import ObservabilityRecorder
-from app.observability.state.memory import InMemoryObservabilityState
-from app.observability.storage.ring import RingEventStorage
 
 
-class ObservabilityApplication:
+class ObservabilityService:
     def __init__(
         self,
         recorder: ObservabilityRecorder,
-        storage: RingEventStorage,
-        state: InMemoryObservabilityState,
-        prometheus_exporter: PrometheusMetricsExporter,
-        runtime: WorkerRuntime,
     ) -> None:
         self._recorder = recorder
-        self._storage = storage
-        self._state = state
-        self._prometheus_exporter = prometheus_exporter
-        self._runtime = runtime
 
     async def record_error(
         self, code: str, event: str | None = None, **event_fields: Any
@@ -35,10 +23,11 @@ class ObservabilityApplication:
         )
 
     def model_timings(self, model_name: str, limit: int = 100) -> dict[str, Any]:
-        return {"timings": self._state.recent_timings(model_name, limit)}
+        return {"timings": self._recorder.recent_timings(model_name, limit)}
 
     def runtime_resources(self) -> dict[str, Any]:
-        processes = self._state.latest_resources() or self._runtime.process_metrics()
+        runtime = self._recorder.latest_runtime()
+        processes = self._recorder.latest_resources()
         models = [
             {
                 "model": model,
@@ -55,30 +44,28 @@ class ObservabilityApplication:
             }
             for model, data in sorted(processes.items())
         ]
-        cpu_requested = self._runtime.cpu_requested_threads()
         return {
-            "cpu_budget_threads": self._runtime.cpu_budget,
-            "cpu_requested_threads": cpu_requested,
-            "cpu_available_threads": self._runtime.cpu_budget - cpu_requested,
+            "cpu_budget_threads": int(runtime.get("cpu_budget_threads", 0)),
+            "cpu_requested_threads": int(runtime.get("cpu_requested_threads", 0)),
+            "cpu_available_threads": int(runtime.get("cpu_available_threads", 0)),
             "models": models,
         }
 
     def prometheus_metrics(self) -> str:
-        return self._prometheus_exporter.render(
-            self._state.metrics_snapshot(),
-            self._runtime.loaded_models(),
-            self._runtime.process_metrics(),
-            cpu_budget=self._runtime.cpu_budget,
-            cpu_requested=self._runtime.cpu_requested_threads(),
+        runtime = self._recorder.latest_runtime()
+        processes = self._recorder.latest_resources()
+        loaded_models = runtime.get("loaded_models") or {
+            model: str(data["version"])
+            for model, data in processes.items()
+            if data.get("status") == "running" and data.get("version") is not None
+        }
+        return render_prometheus_metrics(
+            self._recorder.metrics_snapshot(),
+            dict(loaded_models),
+            processes,
+            cpu_budget=runtime.get("cpu_budget_threads"),
+            cpu_requested=runtime.get("cpu_requested_threads"),
         )
 
     def recent_events(self, limit: int = 100) -> dict[str, Any]:
-        limit = max(0, min(limit, 1000))
-        return {
-            "events": [
-                event_to_dict(event) for event in self._storage.read_latest(limit)
-            ]
-        }
-
-    async def write_event(self, event: str, **fields: Any) -> None:
-        await self._recorder.record(event, **fields)
+        return {"events": self._recorder.recent_events(limit)}

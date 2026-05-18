@@ -17,13 +17,13 @@ def to_http_error(exc: ServingError) -> HTTPException:
     )
 
 
-def raise_recorded_error(
+async def raise_recorded_error(
     container: ApplicationContainer,
     exc: ServingError,
     event: str | None = None,
     **event_fields: Any,
 ) -> NoReturn:
-    container.observability.record_error(
-        exc.code, event, **event_fields, error_code=exc.code, error=exc.message
+    await container.observability.record_error(
+        exc.code, event, **event_fields, error=exc.message
     )
     raise to_http_error(exc)
